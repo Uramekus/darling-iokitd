@@ -24,6 +24,7 @@
 #include <IOKit/IOReturn.h>
 #include <os/log.h>
 #include <stdexcept>
+#import <Foundation/NSException.h>
 #include "IOIterator.h"
 
 extern "C" {
@@ -49,6 +50,16 @@ IOIterator* ServiceRegistry::iteratorForMatchingServices(NSDictionary* criteria)
 	return new IOIterator(matching);
 }
 
+IOService* ServiceRegistry::firstMatchingService(NSDictionary* criteria) const
+{
+	for (auto it = m_registeredServices.begin(); it != m_registeredServices.end(); it++)
+	{
+		if ((*it)->matches(criteria))
+			return *it;
+	}
+	return nullptr;
+}
+
 void ServiceRegistry::registerService(IOService* service)
 {
 	m_registeredServices.push_back(service);
@@ -63,8 +74,66 @@ kern_return_t is_io_service_get_matching_services_ool
 	mach_port_t *existing
 )
 {
-	// TODO
-    return kIOReturnUnsupported;
+	CFStringRef errorString = nullptr;
+	@try
+	{
+		try
+		{
+			CFTypeRef criteria = IOCFUnserializeBinary(matching, matchingCnt, nullptr, 0, &errorString);
+			if (!criteria)
+				criteria = IOCFUnserialize(matching, nullptr, 0, &errorString);
+
+			if (!criteria)
+				throwCFStringException(CFSTR("io_service_get_matching_services_ool(): cannot parse 'matching': %@"), errorString);
+
+			if (CFGetTypeID(criteria) != CFDictionaryGetTypeID())
+			{
+				CFRelease(criteria);
+				throw std::runtime_error("io_service_get_matching_services_ool(): dictionary expected");
+			}
+
+			IOIterator* iterator = ServiceRegistry::instance()->iteratorForMatchingServices((NSDictionary*) criteria);
+			CFRelease(criteria);
+
+			*existing = iterator->port();
+			iterator->releaseLater();
+
+			if (result)
+				*result = kIOReturnSuccess;
+
+			return kIOReturnSuccess;
+		}
+		catch (const std::exception& e)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_ool: %s", e.what());
+			if (errorString)
+				CFRelease(errorString);
+
+			if (result)
+				*result = kIOReturnBadArgument;
+			return kIOReturnBadArgument;
+		}
+		catch (...)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_ool: unknown C++ exception");
+			if (errorString)
+				CFRelease(errorString);
+
+			if (result)
+				*result = kIOReturnBadArgument;
+			return kIOReturnBadArgument;
+		}
+	}
+	@catch (NSException* e)
+	{
+		os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_ool: NSException: %s", [[e description] UTF8String]);
+		if (errorString)
+			CFRelease(errorString);
+
+		if (result)
+			*result = kIOReturnBadArgument;
+		return kIOReturnBadArgument;
+	}
 }
 
 kern_return_t is_io_service_get_matching_services_bin
@@ -76,31 +145,52 @@ kern_return_t is_io_service_get_matching_services_bin
 )
 {
 	CFStringRef errorString = nullptr;
-	try
+	@try
 	{
-		CFTypeRef criteria = IOCFUnserializeBinary(matching, matchingCnt, nullptr, 0, &errorString);
+		try
+		{
+			CFTypeRef criteria = IOCFUnserializeBinary(matching, matchingCnt, nullptr, 0, &errorString);
 
-		if (!criteria)
-			throwCFStringException(CFSTR("io_service_get_matching_services_bin(): cannot parse 'matching': %@"), errorString);
-		
-		if (CFGetTypeID(criteria) != CFDictionaryGetTypeID())
-			throw std::runtime_error("io_service_get_matching_services_bin(): dictionary expected");
+			if (!criteria)
+				throwCFStringException(CFSTR("io_service_get_matching_services_bin(): cannot parse 'matching': %@"), errorString);
+			
+			if (CFGetTypeID(criteria) != CFDictionaryGetTypeID())
+			{
+				CFRelease(criteria);
+				throw std::runtime_error("io_service_get_matching_services_bin(): dictionary expected");
+			}
 
-		// Criteria example:
-		// IOProviderClass -> IODisplayConnect
-		IOIterator* iterator = ServiceRegistry::instance()->iteratorForMatchingServices((NSDictionary*) criteria);
-		CFShow(criteria);
-		CFRelease(criteria);
+			// Criteria example:
+			// IOProviderClass -> IODisplayConnect
+			IOIterator* iterator = ServiceRegistry::instance()->iteratorForMatchingServices((NSDictionary*) criteria);
+			CFRelease(criteria);
 
-		*existing = iterator->port();
+			*existing = iterator->port();
 
-		iterator->releaseLater();
+			iterator->releaseLater();
 
-		return kIOReturnSuccess;
+			return kIOReturnSuccess;
+		}
+		catch (const std::exception& e)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_bin: %s", e.what());
+			if (errorString)
+				CFRelease(errorString);
+
+			return kIOReturnBadArgument;
+		}
+		catch (...)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_bin: unknown C++ exception");
+			if (errorString)
+				CFRelease(errorString);
+
+			return kIOReturnBadArgument;
+		}
 	}
-	catch (const std::exception& e)
+	@catch (NSException* e)
 	{
-		os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_bin: %s", e.what());
+		os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services_bin: NSException: %s", [[e description] UTF8String]);
 		if (errorString)
 			CFRelease(errorString);
 
@@ -115,6 +205,122 @@ kern_return_t is_io_service_get_matching_services
 	mach_port_t *existing
 )
 {
-    // Old unsupported API
-    return kIOReturnUnsupported;
+	CFStringRef errorString = nullptr;
+	@try
+	{
+		try
+		{
+			CFTypeRef criteria = IOCFUnserialize(matching, nullptr, 0, &errorString);
+
+			if (!criteria)
+				throwCFStringException(CFSTR("io_service_get_matching_services(): cannot parse 'matching': %@"), errorString);
+			
+			if (CFGetTypeID(criteria) != CFDictionaryGetTypeID())
+			{
+				CFRelease(criteria);
+				throw std::runtime_error("io_service_get_matching_services(): dictionary expected");
+			}
+
+			IOIterator* iterator = ServiceRegistry::instance()->iteratorForMatchingServices((NSDictionary*) criteria);
+			CFRelease(criteria);
+
+			*existing = iterator->port();
+
+			iterator->releaseLater();
+
+			return kIOReturnSuccess;
+		}
+		catch (const std::exception& e)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services: %s", e.what());
+			if (errorString)
+				CFRelease(errorString);
+
+			return kIOReturnBadArgument;
+		}
+		catch (...)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services: unknown C++ exception");
+			if (errorString)
+				CFRelease(errorString);
+
+			return kIOReturnBadArgument;
+		}
+	}
+	@catch (NSException* e)
+	{
+		os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_services: NSException: %s", [[e description] UTF8String]);
+		if (errorString)
+			CFRelease(errorString);
+
+		return kIOReturnBadArgument;
+	}
+}
+
+kern_return_t is_io_service_get_matching_service_bin
+(
+	mach_port_t master_port,
+	io_struct_inband_t matching,
+	mach_msg_type_number_t matchingCnt,
+	mach_port_t *service
+)
+{
+	CFStringRef errorString = nullptr;
+	@try
+	{
+		try
+		{
+			CFTypeRef criteria = IOCFUnserializeBinary(matching, matchingCnt, nullptr, 0, &errorString);
+
+			if (!criteria)
+				throwCFStringException(CFSTR("io_service_get_matching_service_bin(): cannot parse 'matching': %@"), errorString);
+			
+			if (CFGetTypeID(criteria) != CFDictionaryGetTypeID())
+			{
+				CFRelease(criteria);
+				throw std::runtime_error("io_service_get_matching_service_bin(): dictionary expected");
+			}
+
+			IOService* matched = ServiceRegistry::instance()->firstMatchingService((NSDictionary*) criteria);
+			CFRelease(criteria);
+
+			if (matched)
+			{
+				*service = matched->port();
+				return kIOReturnSuccess;
+			}
+			else
+			{
+				*service = MACH_PORT_NULL;
+				return kIOReturnNotFound;
+			}
+		}
+		catch (const std::exception& e)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_service_bin: %s", e.what());
+			if (errorString)
+				CFRelease(errorString);
+
+			*service = MACH_PORT_NULL;
+			return kIOReturnBadArgument;
+		}
+		catch (...)
+		{
+			os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_service_bin: unknown C++ exception");
+			if (errorString)
+				CFRelease(errorString);
+
+			*service = MACH_PORT_NULL;
+			return kIOReturnBadArgument;
+		}
+	}
+	@catch (NSException* e)
+	{
+		os_log_error(OS_LOG_DEFAULT, "is_io_service_get_matching_service_bin: NSException: %s", [[e description] UTF8String]);
+		if (errorString)
+			CFRelease(errorString);
+
+		*service = MACH_PORT_NULL;
+		return kIOReturnBadArgument;
+	}
 }

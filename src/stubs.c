@@ -50,8 +50,7 @@ kern_return_t is_io_service_close
 	mach_port_t connection
 )
 {
-    STUB();
-    return KERN_NOT_SUPPORTED;
+    return 0; // kIOReturnSuccess
 }
 
 kern_return_t is_io_connect_get_service
@@ -642,18 +641,6 @@ kern_return_t is_io_server_version
 }
 
 
-kern_return_t is_io_service_get_matching_service_bin
-(
-	mach_port_t master_port,
-	io_struct_inband_t matching,
-	mach_msg_type_number_t matchingCnt,
-	mach_port_t *service
-)
-{
-    STUB();
-    return KERN_NOT_SUPPORTED;
-}
-
 kern_return_t is_io_service_match_property_table_bin
 (
 	mach_port_t service,
@@ -764,3 +751,30 @@ kern_return_t is_io_registry_entry_get_property_bin_buf
 	STUB();
 	return KERN_NOT_SUPPORTED;
 }
+
+kern_return_t is_io_connect_map_shared_memory(
+    mach_port_t connection,
+    uint32_t memory_type,
+    task_t into_task,
+    mach_vm_address_t *address,
+    mach_vm_size_t *size,
+    uint32_t flags,
+    io_name_t property_name,
+    io_struct_inband_t inband_output,
+    mach_msg_type_number_t *inband_outputCnt
+)
+{
+    STUB();
+    return KERN_NOT_SUPPORTED;
+}
+
+kern_return_t is_io_service_wait_quiet_with_options(
+    mach_port_t service,
+    mach_timespec_t wait_time,
+    uint32_t options
+)
+{
+    STUB();
+    return KERN_NOT_SUPPORTED;
+}
+

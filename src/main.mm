@@ -32,6 +32,7 @@
 #include "IODisplayConnectX11.h"
 #include "PowerAssertions.h"
 #include "IOSurfaceRoot.h"
+#include "IOPlatformExpertDevice.h"
 
 extern "C" {
 #include "iokitmigServer.h"
@@ -46,6 +47,7 @@ static boolean_t iokitSaveAuditTrail(mach_msg_header_t *message, mach_msg_header
 
 int main(int argc, const char** argv)
 {
+	signal(SIGPIPE, SIG_IGN);
 	mach_port_t bs;
 	kern_return_t ret;
 
@@ -145,6 +147,7 @@ static void discoverAllDevices()
 	ServiceRegistry* registry = ServiceRegistry::instance();
 	// Trick to make sure the root object gets instantiated first and gets the lowest ID
 	IORegistryEntry::root();
+	IOPlatformExpertDevice::registerSelf(registry);
 	IODisplayConnectX11::discoverDevices(registry);
 	IOSurfaceRoot::registerSelf(registry);
 }
